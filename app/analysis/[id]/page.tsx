@@ -1,52 +1,47 @@
-"use client";
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-
-// Mock database for the single analysis view
-const ANALYSIS_DB: Record<string, any> = {
-  "hist_1": {
-    title: "Uncaught TypeError: map of undefined",
-    framework: "React",
-    timestamp: "2024-02-15 14:22",
-    originalError: "Uncaught TypeError: Cannot read properties of undefined (reading 'map')\n    at renderDashboard (main.js:142:24)\n    at async initApp (main.js:12:1)",
-    whatBroke: "A critical TypeError was triggered at runtime. Your application attempted to invoke the .map() prototype on a variable that returned undefined.",
-    whyHappened: "The asynchronous data fetch in your fetchUsers() method is returning an empty response because the Authorization header is missing from the request lifecycle.",
-    fixSteps: [
-      { id: "01", text: "Initialize your state with an empty array [] to prevent initial null-pointer mapping." },
-      { id: "02", text: "Implement Optional Chaining to safeguard against unexpected API structures." }
-    ],
-    codePatch: {
-      comment: "// Proposed Fix",
-      code: "const users = data?.map(u => u.id) || [];\n\n// Adding validation guard\nif (!users.length) return <EmptyState />;"
-    },
-    prevention: "Enable strict null checks in your tsconfig.json to catch these inconsistencies during synthesis rather than at runtime."
-  },
-  "hist_2": {
-    title: "Segmentation fault: pointer dereference",
-    framework: "Kernel",
-    timestamp: "2024-02-14 09:15",
-    originalError: "kernel: [ 124.5218] segfault at 0 ip 00007f3a2b7f sp 00007ffe34\nkernel: error 4 in libc-2.31.so[7f3a2b6e+178000]",
-    whatBroke: "Direct null pointer dereference in the memory allocator. The kernel attempted to read address 0x0 resulting in immediate process termination.",
-    whyHappened: "A boundary condition in the slab allocator was met where the buffer pointer was not validated after an OOM (Out Of Memory) event during high-pressure IO.",
-    fixSteps: [
-      { id: "01", text: "Add mandatory null-pointer verification post-allocation." },
-      { id: "02", text: "Implement a fallback allocation strategy for low-memory environments." }
-    ],
-    codePatch: {
-      comment: "// Kernel space patch",
-      code: "void *ptr = kmalloc(size, GFP_KERNEL);\nif (unlikely(!ptr)) {\n    pr_err(\"Allocator failure: OOM\\n\");\n    return -ENOMEM;\n}"
-    },
-    prevention: "Always use the 'unlikely()' macro for memory allocation checks to hint the branch predictor in performance-critical paths."
-  }
-};
+import { getAnalysisById, AnalysisRecord } from "@/lib/analysisService";
 
 export default function SingleAnalysisPage() {
   const params = useParams();
   const id = params?.id as string;
-  const analysis = ANALYSIS_DB[id] || ANALYSIS_DB["hist_1"]; // Fallback to first item if not found
+  const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAnalysis() {
+      if (id) {
+        try {
+          const data = await getAnalysisById(id);
+          setAnalysis(data);
+        } catch (error) {
+          console.error("Error fetching analysis:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    }
+    fetchAnalysis();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="h-screen bg-[#0B0F14] flex items-center justify-center font-mono">
+        <p className="text-primary text-xs uppercase tracking-[0.5em] animate-pulse">Accessing Neural Record...</p>
+      </div>
+    );
+  }
+
+  if (!analysis) {
+    return (
+      <div className="h-screen bg-[#0B0F14] flex flex-col items-center justify-center font-mono space-y-4">
+        <p className="text-red-500 text-xs uppercase tracking-[0.5em]">Record Corrupted or Not Found</p>
+        <Link href="/history" className="text-slate-500 hover:text-white transition-colors text-[10px] uppercase border border-white/10 px-4 py-2 rounded">Back to Archive</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-[#0B0F14] text-foreground overflow-hidden font-sans selection:bg-primary selection:text-black">
@@ -85,7 +80,9 @@ export default function SingleAnalysisPage() {
             <div className="space-y-6">
               <div>
                 <h4 className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Logged At</h4>
-                <p className="text-sm font-mono text-slate-500">{analysis.timestamp}</p>
+                <p className="text-sm font-mono text-slate-500">
+                  {analysis.createdAt?.toDate ? analysis.createdAt.toDate().toLocaleString() : "Real-time stream"}
+                </p>
               </div>
               <div>
                 <h4 className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Raw Error Buffer</h4>

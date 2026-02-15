@@ -3,21 +3,61 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { saveAnalysis } from "@/lib/analysisService";
 
 export default function LandingPage() {
+  const { user, loginWithGoogle, logout } = useAuth();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorInput, setErrorInput] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState<any>(null);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!errorInput.trim()) return;
     setIsAnalyzing(true);
     setShowAnalysis(false);
     
     // Simulate AI Processing
-    setTimeout(() => {
+    setTimeout(async () => {
+      const mockResult = {
+        title: errorInput.split('\n')[0].substring(0, 40) + "...",
+        framework: "React", // In real version, AI would detect this
+        language: "TypeScript",
+        originalError: errorInput,
+        whatBroke: "A critical TypeError was triggered at runtime. Your application attempted to invoke the .map() prototype on a variable that returned undefined.",
+        whyHappened: "The asynchronous data fetch in your method is returning an empty response because the context is lost during the execution.",
+        fixSteps: [
+          { id: "01", text: "Initialize your state with an empty array [] to prevent initial null-pointer mapping." },
+          { id: "02", text: "Implement Optional Chaining to safeguard against unexpected API structures." }
+        ],
+        codePatch: {
+          comment: "// Proposed Fix",
+          code: "const items = data?.map(u => u.id) || [];"
+        },
+        prevention: "Enable strict null checks in your tsconfig.json.",
+        severity: "High" as const,
+      };
+
+      setCurrentAnalysis(mockResult);
       setIsAnalyzing(false);
       setShowAnalysis(true);
+
+      // Save to Firebase if user is logged in
+      if (user) {
+        setIsSaving(true);
+        try {
+          await saveAnalysis({
+            ...mockResult,
+            userId: user.uid,
+          });
+        } catch (err) {
+          console.error("Auto-save failed:", err);
+        } finally {
+          setIsSaving(false);
+        }
+      }
     }, 1500);
   };
 
@@ -46,12 +86,34 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="text-xs font-mono uppercase tracking-widest text-slate-500 hover:text-white transition-colors">
-            Login
-          </button>
-          <button className="bg-primary/10 border border-primary/30 text-primary px-4 py-1.5 rounded text-[11px] font-mono uppercase tracking-widest font-bold hover:bg-primary hover:text-black transition-all shadow-glow hover:shadow-primary/40">
-            Sign Up
-          </button>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <Link href="/settings" className="w-8 h-8 rounded border border-primary/40 bg-primary/20 flex items-center justify-center text-[10px] font-mono text-primary hover:bg-primary hover:text-black transition-all shadow-glow">
+                {user.displayName?.[0] || user.email?.[0] || 'U'}
+              </Link>
+              <button 
+                onClick={logout}
+                className="text-[10px] font-mono uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <>
+              <button 
+                onClick={loginWithGoogle}
+                className="text-xs font-mono uppercase tracking-widest text-slate-500 hover:text-white transition-colors"
+              >
+                Login
+              </button>
+              <button 
+                onClick={loginWithGoogle}
+                className="bg-primary/10 border border-primary/30 text-primary px-4 py-1.5 rounded text-[11px] font-mono uppercase tracking-widest font-bold hover:bg-primary hover:text-black transition-all shadow-glow hover:shadow-primary/40"
+              >
+                Sign Up
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
