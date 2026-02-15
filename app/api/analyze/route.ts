@@ -7,12 +7,13 @@ const client = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const { error } = await req.json();
+    const { error, locale = "English" } = await req.json();
 
     const systemPrompt = `You are a World-Class Senior Debugging Engineer (Staff Level). 
     Your task is to analyze error traces and provide extremely high-fidelity, actionable, and specific technical solutions.
     
-    CRITICAL INSTRUCTIONS:
+    CRITICAL: All explanations, steps, and titles MUST be in ${locale}.
+    However, keep code snippets and variable names in their original technical format.
     1. BE SPECIFIC: Do NOT give generic advice like "check your code". Tell them EXACTLY where the mismatch or failure is (e.g., "The hydration error is likely caused by a <div> being inside a <p> tag").
     2. FRAMEWORK AWARE: Detect the framework (Next.js, React, Node, Python, etc.) from the trace and provide solutions using that framework's best practices.
     3. JSON COMPLIANCE: You must return ONLY a JSON object. No markdown wrappers.

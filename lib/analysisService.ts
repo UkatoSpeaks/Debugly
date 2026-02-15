@@ -51,14 +51,20 @@ export const getUserAnalyses = async (userId: string) => {
   try {
     const q = query(
       collection(db, "analyses"),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc")
+      where("userId", "==", userId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const data = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as AnalysisRecord[];
+
+    // Sort in-memory to avoid mandatory composite index requirements for where + orderBy
+    return data.sort((a, b) => {
+      const timeA = a.createdAt?.seconds || 0;
+      const timeB = b.createdAt?.seconds || 0;
+      return timeB - timeA;
+    });
   } catch (error) {
     console.error("Error fetching analyses:", error);
     throw error;

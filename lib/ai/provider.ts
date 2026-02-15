@@ -14,13 +14,13 @@ export interface DebugResult {
   severity: "Low" | "Medium" | "High" | "Critical";
 }
 
-export const analyzeError = async (error: string): Promise<DebugResult> => {
+export const analyzeError = async (error: string, locale: string = "English"): Promise<DebugResult> => {
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ error }),
+    body: JSON.stringify({ error, locale }),
   });
 
   if (!response.ok) {

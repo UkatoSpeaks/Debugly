@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,23 @@ export default function LandingPage() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [selectedLocale, setSelectedLocale] = useState("English");
+  const [copied, setCopied] = useState(false);
+
+  const LOCALES = ["English", "Spanish", "French", "German", "Hindi", "Japanese"];
+
+  useEffect(() => {
+    const trigger = localStorage.getItem("debugly_test_trigger");
+    if (trigger) {
+      setErrorInput(trigger);
+      localStorage.removeItem("debugly_test_trigger");
+      // Small delay to ensure state and components are ready
+      setTimeout(() => {
+        const btn = document.querySelector('button[disabled*="false"]');
+        if (btn instanceof HTMLButtonElement) btn.click();
+      }, 500);
+    }
+  }, []);
 
   const handleAnalyze = async () => {
     if (!errorInput.trim()) return;
@@ -23,7 +40,7 @@ export default function LandingPage() {
     setAnalysisError(null);
     
     try {
-      const result = await analyzeError(errorInput);
+      const result = await analyzeError(errorInput, selectedLocale);
       setCurrentAnalysis(result);
       setIsAnalyzing(false);
       setShowAnalysis(true);
@@ -119,11 +136,24 @@ export default function LandingPage() {
               </div>
               <span className="ml-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Input Debug Buffer</span>
             </div>
-            <div className="flex items-center gap-4 text-[10px] font-mono text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 active-pulse"></span>
-                Autodetect: ON
-              </span>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 pr-4 border-r border-white/5">
+                <span className="text-[9px] font-mono text-slate-600 uppercase">Response Language:</span>
+                <select 
+                  value={selectedLocale}
+                  onChange={(e) => setSelectedLocale(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[10px] font-mono text-primary focus:outline-none focus:border-primary/50 transition-all cursor-pointer appearance-none"
+                >
+                  {LOCALES.map(loc => <option key={loc} value={loc} className="bg-slate-900">{loc}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-4 text-[10px] font-mono text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 active-pulse"></span>
+                  Autodetect: ON
+                </span>
+              </div>
             </div>
           </div>
 
@@ -147,13 +177,20 @@ export default function LandingPage() {
 
             {/* Input Overlay Actions */}
             <div className="absolute bottom-6 right-6 flex items-center gap-3">
-               <button className="p-2 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-white transition-colors" title="Upload Log File">
+               <button 
+                onClick={() => setErrorInput("")}
+                className="p-2.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all active:scale-95" 
+                title="Clear Buffer"
+               >
+                 <span className="material-icons-round text-sm">delete_sweep</span>
+               </button>
+               <button className="p-2.5 rounded bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all active:scale-95" title="Upload Log File">
                  <span className="material-icons-round text-sm">upload_file</span>
                </button>
                <button 
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !errorInput.trim()}
-                className="bg-primary hover:bg-white text-black font-mono font-black text-xs uppercase tracking-[0.2em] py-3 px-8 rounded shadow-glow disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2 group active:scale-95"
+                className="bg-primary hover:bg-white text-black font-mono font-black text-[10px] uppercase tracking-[0.2em] py-3.5 px-8 rounded-lg shadow-glow disabled:opacity-30 disabled:shadow-none transition-all flex items-center gap-2 group active:scale-95"
                >
                  {isAnalyzing ? (
                    <span className="material-icons-round text-sm animate-spin">sync</span>
@@ -281,11 +318,16 @@ export default function LandingPage() {
                         <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
                           <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Patched Code</span>
                           <button 
-                            onClick={() => navigator.clipboard.writeText(currentAnalysis.codePatch?.code || "")}
-                            className="text-slate-500 hover:text-white transition-colors" 
+                            onClick={() => {
+                              navigator.clipboard.writeText(currentAnalysis.codePatch?.code || "");
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            }}
+                            className={`flex items-center gap-1.5 transition-all ${copied ? "text-emerald-400" : "text-slate-500 hover:text-white"}`}
                             title="Copy Patch"
                           >
-                            <span className="material-icons-round text-sm">content_copy</span>
+                            <span className="text-[9px] font-mono leading-none">{copied ? "COPIED" : "COPY"}</span>
+                            <span className="material-icons-round text-sm">{copied ? "done" : "content_copy"}</span>
                           </button>
                         </div>
                         <pre className="p-5 text-xs text-slate-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">

@@ -7,20 +7,26 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserAnalyses, deleteAnalysis, updateAnalysisStatus, AnalysisRecord } from "@/lib/analysisService";
 
 export default function HistoryPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [historyData, setHistoryData] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadHistory() {
+      if (authLoading) return;
+      
       if (user) {
+        setLoading(true);
+        setFetchError(null);
         try {
           const data = await getUserAnalyses(user.uid);
           setHistoryData(data);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Failed to load history:", error);
+          setFetchError(error.message || "Archive decryption failed. Please check your neural link.");
         } finally {
           setLoading(false);
         }
@@ -29,7 +35,7 @@ export default function HistoryPage() {
       }
     }
     loadHistory();
-  }, [user]);
+  }, [user, authLoading]);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -104,7 +110,7 @@ export default function HistoryPage() {
             <div>
               <h1 className="text-4xl font-bold tracking-tighter text-white mb-2 italic">Debug Archive</h1>
               <p className="text-slate-500 text-sm font-mono uppercase tracking-widest">
-                Retrieve Fixes from <span className="text-primary italic">52</span> total sessions
+                Retrieve Fixes from <span className="text-primary italic">{historyData.length}</span> total sessions
               </p>
             </div>
             
@@ -123,7 +129,7 @@ export default function HistoryPage() {
 
           {/* Filter Badges */}
           <div className="flex flex-wrap gap-2 mb-8">
-            {["All", "React", "Next.js", "FastAPI", "Kernel", "Embedded"].map((filter) => (
+            {["All", "React", "Next.js", "FastAPI", "Python", "NodeJS"].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
@@ -138,15 +144,30 @@ export default function HistoryPage() {
             ))}
           </div>
 
-          {/* History List Grid */}
-          {loading ? (
-            <div className="py-20 text-center animate-pulse">
-              <p className="font-mono text-xs uppercase tracking-[0.3em] text-slate-500">Decrypting Archive...</p>
+          {/* Content Area */}
+          {!user && !authLoading ? (
+             <div className="py-20 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
+               <span className="material-icons-round text-5xl mb-4 text-slate-700">lock_open</span>
+               <h3 className="text-white font-bold text-xl mb-2">Authentication Required</h3>
+               <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">Please sign in to access your secure archive of neural diagnostics and historical fixes.</p>
+               <Link href="/" className="bg-primary text-black px-8 py-3 rounded-lg font-mono text-xs uppercase font-black tracking-widest shadow-glow">Authorize Access</Link>
+             </div>
+          ) : loading || authLoading ? (
+            <div className="py-20 text-center">
+              <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-primary animate-pulse">Decrypting Archive...</p>
+            </div>
+          ) : fetchError ? (
+            <div className="py-20 text-center border border-red-500/20 rounded-2xl bg-red-500/5">
+              <span className="material-icons-round text-5xl mb-4 text-red-500/50">error_outline</span>
+              <h3 className="text-red-500 font-bold text-lg mb-2">Neural Link Failure</h3>
+              <p className="text-slate-400 text-sm mb-6">{fetchError}</p>
+              <button onClick={() => window.location.reload()} className="bg-white/10 text-white px-6 py-2 rounded font-mono text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all">Retry Decryption</button>
             </div>
           ) : filteredHistory.length === 0 ? (
-            <div className="py-20 text-center opacity-30 select-none">
+            <div className="py-20 text-center opacity-30 select-none border border-dashed border-white/5 rounded-2xl">
               <span className="material-icons-round text-5xl mb-4">search_off</span>
-              <p className="font-mono text-xs uppercase tracking-widest">No matching sessions found</p>
+              <p className="font-mono text-xs uppercase tracking-widest">No matching sessions found in this cluster</p>
             </div>
           ) : (
             <div className="grid gap-3">
