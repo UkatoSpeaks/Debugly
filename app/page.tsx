@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { saveAnalysis } from "@/lib/analysisService";
+import { analyzeError } from "@/lib/ai/provider";
 
 export default function LandingPage() {
   const { user, loginWithGoogle, logout } = useAuth();
@@ -13,34 +14,17 @@ export default function LandingPage() {
   const [errorInput, setErrorInput] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<any>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!errorInput.trim()) return;
     setIsAnalyzing(true);
     setShowAnalysis(false);
+    setAnalysisError(null);
     
-    // Simulate AI Processing
-    setTimeout(async () => {
-      const mockResult = {
-        title: errorInput.split('\n')[0].substring(0, 40) + "...",
-        framework: "React", // In real version, AI would detect this
-        language: "TypeScript",
-        originalError: errorInput,
-        whatBroke: "A critical TypeError was triggered at runtime. Your application attempted to invoke the .map() prototype on a variable that returned undefined.",
-        whyHappened: "The asynchronous data fetch in your method is returning an empty response because the context is lost during the execution.",
-        fixSteps: [
-          { id: "01", text: "Initialize your state with an empty array [] to prevent initial null-pointer mapping." },
-          { id: "02", text: "Implement Optional Chaining to safeguard against unexpected API structures." }
-        ],
-        codePatch: {
-          comment: "// Proposed Fix",
-          code: "const items = data?.map(u => u.id) || [];"
-        },
-        prevention: "Enable strict null checks in your tsconfig.json.",
-        severity: "High" as const,
-      };
-
-      setCurrentAnalysis(mockResult);
+    try {
+      const result = await analyzeError(errorInput);
+      setCurrentAnalysis(result);
       setIsAnalyzing(false);
       setShowAnalysis(true);
 
@@ -49,7 +33,7 @@ export default function LandingPage() {
         setIsSaving(true);
         try {
           await saveAnalysis({
-            ...mockResult,
+            ...result,
             userId: user.uid,
           });
         } catch (err) {
@@ -58,7 +42,11 @@ export default function LandingPage() {
           setIsSaving(false);
         }
       }
-    }, 1500);
+    } catch (err) {
+      console.error("Analysis failed:", err);
+      setAnalysisError("Neural processing failed. Please check your connection or try a different error trace.");
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -191,7 +179,7 @@ export default function LandingPage() {
             </h2>
             <div className="flex gap-4">
               <div className="text-[9px] font-mono text-slate-600 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                Model: Reasoning-XL-4.2
+                Model: Llama 3.1 8B
               </div>
             </div>
           </div>
@@ -201,6 +189,7 @@ export default function LandingPage() {
             <AnimatePresence mode="wait">
               {!showAnalysis && !isAnalyzing && (
                 <motion.div 
+                  key="waiting"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -218,6 +207,7 @@ export default function LandingPage() {
 
               {isAnalyzing && (
                 <motion.div 
+                  key="analyzing"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="h-full flex flex-col items-center justify-center"
@@ -234,8 +224,9 @@ export default function LandingPage() {
                 </motion.div>
               )}
 
-              {showAnalysis && (
+              {showAnalysis && currentAnalysis && (
                 <motion.div 
+                  key="analysis"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="max-w-3xl mx-auto space-y-6"
@@ -248,7 +239,7 @@ export default function LandingPage() {
                     </div>
                     <div className="p-6">
                       <p className="text-slate-300 text-sm leading-relaxed">
-                        A critical <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded font-mono text-xs">TypeError</code> was triggered at runtime. Your application attempted to invoke the <code>.map()</code> prototype on a variable that returned <code>undefined</code>.
+                        {currentAnalysis.whatBroke}
                       </p>
                     </div>
                   </div>
@@ -261,45 +252,45 @@ export default function LandingPage() {
                     </div>
                     <div className="p-6">
                       <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                        The asynchronous data fetch in your <code className="text-primary/70 font-mono text-xs">fetchUsers()</code> method is returning an empty response because the <code>Authorization</code> header is missing from the request lifecycle.
+                        {currentAnalysis.whyHappened}
                       </p>
                       <div className="flex gap-2">
-                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-mono text-yellow-300 uppercase">Race Condition</span>
-                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-mono text-yellow-300 uppercase">Auth Failure</span>
+                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-mono text-yellow-300 uppercase">{currentAnalysis.framework}</span>
+                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-mono text-yellow-300 uppercase">{currentAnalysis.language}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Card: The Fix & Code */}
-                  <div className="rounded-xl border border-primary/20 bg-primary/[0.02] overflow-hidden">
+                  <div className="rounded-xl border border-primary/20 bg-primary/[0.02] overflow-hidden shadow-2xl shadow-black/40">
                     <div className="px-5 py-3 border-b border-primary/20 bg-primary/5 flex items-center gap-2">
                       <span className="material-icons-round text-primary text-sm">auto_fix_high</span>
                       <h4 className="font-mono text-[11px] font-black text-primary uppercase tracking-widest">Recommended Fix</h4>
                     </div>
                     <div className="p-6 space-y-6">
                       <div className="space-y-4">
-                        <div className="flex items-start gap-4">
-                          <span className="w-5 h-5 rounded bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold mt-0.5">01</span>
-                          <p className="text-slate-300 text-[13px]">Initialize your state with an empty array <code className="text-primary font-mono">[]</code> to prevent initial null-pointer mapping.</p>
-                        </div>
-                        <div className="flex items-start gap-4">
-                          <span className="w-5 h-5 rounded bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold mt-0.5">02</span>
-                          <p className="text-slate-300 text-[13px]">Implement **Optional Chaining** to safeguard against unexpected API structures.</p>
-                        </div>
+                        {currentAnalysis.fixSteps?.map((step: any, idx: number) => (
+                          <div key={`step-${step.id || idx}`} className="flex items-start gap-4">
+                            <span className="w-5 h-5 rounded bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold mt-0.5">{step.id || `0${idx + 1}`}</span>
+                            <p className="text-slate-300 text-[13px]">{step.text}</p>
+                          </div>
+                        ))}
                       </div>
 
                       <div className="rounded-lg bg-black/40 border border-white/5 overflow-hidden font-mono">
                         <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
                           <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Patched Code</span>
-                          <button className="text-slate-500 hover:text-white transition-colors" title="Copy Patch">
+                          <button 
+                            onClick={() => navigator.clipboard.writeText(currentAnalysis.codePatch?.code || "")}
+                            className="text-slate-500 hover:text-white transition-colors" 
+                            title="Copy Patch"
+                          >
                             <span className="material-icons-round text-sm">content_copy</span>
                           </button>
                         </div>
-                        <pre className="p-5 text-xs text-slate-400 leading-relaxed overflow-x-auto">
-                          <span className="token-comment">// Proposed Fix</span>&#10;
-                          <span className="token-keyword">const</span> users = data<span className="text-primary font-bold">?.</span>map(u =&gt; u.id) <span className="text-primary font-bold">|| []</span>;&#10;
-                          <span className="token-comment">// Adding validation guard</span>&#10;
-                          <span className="token-keyword">if</span> (!users.length) <span className="token-keyword">return</span> <span className="text-emerald-400">&lt;EmptyState /&gt;</span>;
+                        <pre className="p-5 text-xs text-slate-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">
+                          <span className="token-comment">{currentAnalysis.codePatch?.comment}</span>&#10;
+                          {currentAnalysis.codePatch?.code}
                         </pre>
                       </div>
                     </div>
@@ -313,14 +304,21 @@ export default function LandingPage() {
                     </div>
                     <div className="p-6">
                       <p className="text-slate-500 text-[12px] leading-relaxed italic">
-                        "Enable strict null checks in your <code className="text-slate-400">tsconfig.json</code> to catch these inconsistencies during synthesis rather than at runtime. Also, consider implementing a generic error boundary for async data streams."
+                        "{currentAnalysis.prevention}"
                       </p>
                     </div>
                   </div>
 
+                  {/* Analysis Error Message */}
+                  {analysisError && (
+                    <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-mono text-center">
+                      {analysisError}
+                    </div>
+                  )}
+
                   {/* Footnote */}
                   <div className="text-center pt-10 opacity-30">
-                    <p className="text-[9px] font-mono uppercase tracking-[0.3em]">Analysis complete in 1,24ms • Model-Hash #8F2A</p>
+                    <p className="text-[9px] font-mono uppercase tracking-[0.3em]">Analysis complete • Model-Hash #llama-3.1-8b</p>
                   </div>
                 </motion.div>
               )}

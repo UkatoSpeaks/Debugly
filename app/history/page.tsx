@@ -153,7 +153,7 @@ export default function HistoryPage() {
               <AnimatePresence mode="popLayout">
                 {filteredHistory.map((item, index) => (
                   <motion.div
-                    key={item.id}
+                    key={item.id || index}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
