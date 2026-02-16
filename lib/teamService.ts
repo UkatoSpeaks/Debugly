@@ -153,8 +153,7 @@ export const getUserOrganizations = async (userId: string) => {
     }));
   } catch (error) {
     console.error("Error fetching user organizations:", error);
-    // If it's an index error, Firestore usually provides a link in the console
-    return [];
+    throw error;
   }
 };
 

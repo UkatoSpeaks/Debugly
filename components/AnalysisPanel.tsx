@@ -13,6 +13,7 @@ interface AnalysisPanelProps {
   currentAnalysis: any;
   analysisId?: string | null;
   analysisError: string | null;
+  isSaving?: boolean;
   copied: boolean;
   onCopy: (code: string) => void;
   onNewAnalysis?: (refined: any) => void;
@@ -24,6 +25,7 @@ export default function AnalysisPanel({
   currentAnalysis,
   analysisId,
   analysisError,
+  isSaving,
   copied,
   onCopy,
   onNewAnalysis
@@ -194,9 +196,20 @@ export default function AnalysisPanel({
                 />
               )}
 
-              {/* Footnote */}
-              <div className="text-center pt-10 opacity-30">
-                <p className="text-[9px] font-mono uppercase tracking-[0.3em]">Analysis complete • Model-Hash #llama-3.1-8b</p>
+              {/* Footnote & Saving State */}
+              <div className="text-center pt-8 pb-4 space-y-4">
+                {isSaving && (
+                  <div className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 w-fit mx-auto animate-pulse">
+                    <span className="w-1 h-1 rounded-full bg-primary"></span>
+                    <span className="text-[9px] font-mono text-primary uppercase tracking-widest">Saving to Neural Archive...</span>
+                  </div>
+                )}
+                {!isSaving && !analysisId && user && (
+                  <div className="text-[9px] font-mono text-red-400 capitalize bg-red-400/5 border border-red-400/10 py-1.5 px-4 rounded-lg">
+                    ⚠️ Auto-save failed. Collaborative features unavailable for this session.
+                  </div>
+                )}
+                <p className="text-[9px] font-mono uppercase tracking-[0.3em] opacity-30">Analysis complete • Model-Hash #llama-3.1-8b</p>
               </div>
 
               {/* Collaborative Comments */}

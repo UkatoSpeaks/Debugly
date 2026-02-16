@@ -67,8 +67,12 @@ export default function LandingPage() {
             modelId: selectedModel
           });
           setAnalysisId(id);
-        } catch (err) {
-          console.error("Auto-save failed:", err);
+        } catch (err: any) {
+          console.error("CRITICAL: Auto-save failed.", err);
+          // If you see a link in the browser console, click it to create the required Firestore index
+          if (err.message?.includes("index")) {
+            console.warn("Firestore index missing. Check console for creation link.");
+          }
         } finally {
           setIsSaving(false);
         }
@@ -108,6 +112,7 @@ export default function LandingPage() {
           isAnalyzing={isAnalyzing}
           currentAnalysis={currentAnalysis}
           analysisId={analysisId}
+          isSaving={isSaving}
           analysisError={analysisError}
           copied={copied}
           onCopy={handleCopy}
