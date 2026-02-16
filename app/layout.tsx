@@ -16,6 +16,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Debugly - AI Native Debugging",
   description: "Instantly resolve stack traces, console logs, and runtime errors with precise code fixes.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
