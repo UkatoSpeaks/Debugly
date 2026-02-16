@@ -9,8 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "chalk": "^5.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^14.0.3",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.564.0",
@@ -20,7 +23,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-firebase-hooks": "^5.1.1",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "uuid": "^13.0.0",
+    "xerox": "^0.2.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

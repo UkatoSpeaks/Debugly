@@ -1,17 +1,22 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { getUserStats } from "@/lib/analysisService";
+import { getUserProfile, generateApiToken, revokeApiToken, UserProfile } from "@/lib/userService";
 
 export default function SettingsPage() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState({ totalFixes: 0, timeSaved: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [showToken, setShowToken] = useState(false);
 
   useEffect(() => {
     async function fetchStats() {
@@ -19,8 +24,10 @@ export default function SettingsPage() {
         try {
           const s = await getUserStats(user.uid);
           setStats(s);
+          const p = await getUserProfile(user.uid);
+          setProfile(p);
         } catch (error) {
-          console.error("Error fetching stats:", error);
+          console.error("Error fetching stats/profile:", error);
         } finally {
           setStatsLoading(false);
         }
@@ -28,6 +35,39 @@ export default function SettingsPage() {
     }
     fetchStats();
   }, [user]);
+
+  const handleGenerateToken = async () => {
+    if (!user) return;
+    setIsGenerating(true);
+    setMessage(null);
+    try {
+      const token = await generateApiToken(user.uid);
+      setProfile(prev => prev ? { ...prev, apiToken: token } : null);
+      setMessage({ text: "API Token generated successfully. Keep it secret!", type: "success" });
+      setShowToken(true);
+    } catch (error) {
+      setMessage({ text: "Failed to generate token. Please try again.", type: "error" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRevokeToken = async () => {
+    if (!user || !profile?.apiToken) return;
+    if (!confirm("Are you sure? This will break any CLI or integrations using this token.")) return;
+    
+    setIsGenerating(true);
+    try {
+      await revokeApiToken(user.uid, profile.apiToken);
+      setProfile(prev => prev ? { ...prev, apiToken: undefined } : null);
+      setMessage({ text: "API Token revoked.", type: "success" });
+      setShowToken(false);
+    } catch (error) {
+      setMessage({ text: "Failed to revoke token.", type: "error" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   if (!loading && !user) {
     router.push("/");
@@ -145,6 +185,97 @@ export default function SettingsPage() {
                 </div>
               </div>
             </motion.div>
+
+            {/* Developer Access Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="p-6 rounded-xl border border-white/5 bg-[#0B0F14] shadow-glass relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-[0.02]">
+                <span className="material-icons-round text-8xl">terminal</span>
+              </div>
+              
+              <div className="relative z-10">
+                <h3 className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Developer Access</h3>
+                <div className="space-y-6">
+                  <div className="max-w-xl">
+                    <p className="text-slate-400 text-xs leading-relaxed mb-4 font-mono">
+                      API tokens allow headless access to the neural engine. Use this with the Debugly CLI.
+                    </p>
+                    <div className="bg-yellow-500/5 border border-yellow-500/10 p-3 rounded-lg flex items-start gap-3 mb-6">
+                      <span className="material-icons-round text-yellow-500/50 text-sm">lock</span>
+                      <p className="text-[9px] text-yellow-200/40 leading-relaxed font-mono uppercase tracking-tighter">
+                        Keep your token secret. Sharing it provides full access to your neural history.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {profile?.apiToken ? (
+                      <div className="space-y-4">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                          <div className="flex-1 bg-black/40 rounded-lg border border-white/10 p-3 font-mono text-xs flex items-center justify-between group">
+                            <span className="text-primary truncate pr-4">
+                              {showToken ? profile.apiToken : "••••••••••••••••••••••••••••••••"}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => setShowToken(!showToken)}
+                                className="text-slate-600 hover:text-white transition-all"
+                              >
+                                <span className="material-icons-round text-base">{showToken ? "visibility_off" : "visibility"}</span>
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(profile.apiToken!);
+                                  setMessage({ text: "Token copied to clipboard.", type: "success" });
+                                  setTimeout(() => setMessage(null), 3000);
+                                }}
+                                className="text-slate-600 hover:text-white transition-all"
+                              >
+                                <span className="material-icons-round text-base">content_copy</span>
+                              </button>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={handleRevokeToken}
+                            disabled={isGenerating}
+                            className="px-4 py-3 bg-red-500/5 hover:bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all disabled:opacity-50"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={handleGenerateToken}
+                        disabled={isGenerating}
+                        className="group relative px-6 py-3 bg-primary text-black rounded-lg font-mono text-[10px] font-bold uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 shadow-glow shadow-primary/20"
+                      >
+                        {isGenerating ? "Generating..." : "Generate Neural Key"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            <AnimatePresence>
+              {message && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`p-4 rounded-lg text-[10px] font-mono uppercase tracking-widest border ${
+                    message.type === 'success' ? 'bg-green-500/5 border-green-500/10 text-green-400' : 'bg-red-500/5 border-red-500/10 text-red-400'
+                  }`}
+                >
+                  {message.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Danger Zone */}
             <motion.div 

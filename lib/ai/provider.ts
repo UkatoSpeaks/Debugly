@@ -1,3 +1,5 @@
+import { FileBuffer } from "../analysisService";
+
 export interface DebugResult {
   title: string;
   framework: string;
@@ -14,13 +16,17 @@ export interface DebugResult {
   severity: "Low" | "Medium" | "High" | "Critical";
 }
 
-export const analyzeError = async (error: string, locale: string = "English"): Promise<DebugResult> => {
+export const analyzeError = async (
+  context: FileBuffer[], 
+  locale: string = "English",
+  modelId: string = "llama-3.1-8b-instant"
+): Promise<DebugResult> => {
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ error, locale }),
+    body: JSON.stringify({ context, locale, modelId }),
   });
 
   if (!response.ok) {

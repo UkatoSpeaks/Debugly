@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { getUserAnalysesPaginated, deleteAnalysis, updateAnalysisStatus, AnalysisRecord } from "@/lib/analysisService";
 import { QueryDocumentSnapshot } from "firebase/firestore";
@@ -11,7 +10,7 @@ import HistoryCard from "@/components/HistoryCard";
 
 const PAGE_SIZE = 12;
 
-export default function HistoryPage() {
+export default function HistoryClient() {
   const { user, loading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
@@ -22,27 +21,28 @@ export default function HistoryPage() {
   const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Initial load or filter change
   useEffect(() => {
-    async function initLoad() {
-      if (authLoading || !user) return;
-      
-      setLoading(true);
-      setFetchError(null);
-      try {
-        const { data, lastVisible } = await getUserAnalysesPaginated(user.uid, PAGE_SIZE, null, activeFilter);
-        setHistoryData(data);
-        setLastVisibleDoc(lastVisible);
-        setHasMore(data.length === PAGE_SIZE);
-      } catch (error: any) {
-        console.error("Failed to load history:", error);
-        setFetchError(error.message || "Archive decryption failed. Please check your neural link.");
-      } finally {
-        setLoading(false);
-      }
+    if (user && !authLoading) {
+      loadHistory();
     }
-    initLoad();
   }, [user, authLoading, activeFilter]);
+
+  const loadHistory = async () => {
+    if (!user) return;
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const { data, lastVisible } = await getUserAnalysesPaginated(user.uid, PAGE_SIZE, null, activeFilter);
+      setHistoryData(data);
+      setLastVisibleDoc(lastVisible);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch (error: any) {
+      console.error("Failed to load history:", error);
+      setFetchError(error.message || "Archive decryption failed. Please check your neural link.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLoadMore = async () => {
     if (isLoadingMore || !hasMore || !user) return;
@@ -92,10 +92,8 @@ export default function HistoryPage() {
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-sans selection:bg-primary selection:text-black">
       <Navbar />
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-6 py-10 relative">
         <div className="max-w-5xl mx-auto">
-          {/* Header Section */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
               <h1 className="text-4xl font-bold tracking-tighter text-white mb-2 italic">Debug Archive</h1>
@@ -104,29 +102,36 @@ export default function HistoryPage() {
               </p>
             </div>
             
-            {/* Search Input Container */}
-            <div className="relative w-full md:w-96">
-              <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
-              <input 
-                type="text" 
-                placeholder="Search error signatures, tags, or frameworks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#0B0F14] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-300 placeholder:text-slate-700 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono"
-              />
+            <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+              <button 
+                onClick={loadHistory}
+                className="bg-slate-900/50 border border-white/5 text-slate-400 px-4 py-2.5 rounded-lg font-mono text-[10px] uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-icons-round text-sm">sync</span>
+                Sync Archive
+              </button>
+              <div className="relative w-full md:w-72">
+                <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
+                <input 
+                  type="text" 
+                  placeholder="Filter signatures..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#0B0F14] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-300 placeholder:text-slate-700 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Filter Badges */}
           <div className="flex flex-wrap gap-2 mb-8">
-            {["All", "React", "Next.js", "FastAPI", "Python", "NodeJS"].map((filter) => (
+            {["All", "React", "Next.js", "Node.js", "Python", "TypeScript", "Other"].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-1.5 rounded text-[10px] font-mono uppercase tracking-widest transition-all border ${
+                className={`px-4 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-widest border transition-all ${
                   activeFilter === filter 
-                    ? "bg-primary/10 border-primary/50 text-primary shadow-glow shadow-primary/10" 
-                    : "bg-white/5 border-white/5 text-slate-500 hover:border-white/10 hover:text-slate-300"
+                  ? "bg-primary border-primary text-black font-bold shadow-glow" 
+                  : "bg-white/5 border-white/10 text-slate-500 hover:border-white/20 hover:text-white"
                 }`}
               >
                 {filter}
@@ -134,19 +139,14 @@ export default function HistoryPage() {
             ))}
           </div>
 
-          {/* Content Area */}
-          {!user && !authLoading ? (
-             <div className="py-20 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
-               <span className="material-icons-round text-5xl mb-4 text-slate-700">lock_open</span>
-               <h3 className="text-white font-bold text-xl mb-2">Authentication Required</h3>
-               <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">Please sign in to access your secure archive of neural diagnostics and historical fixes.</p>
-               <Link href="/" className="bg-primary text-black px-8 py-3 rounded-lg font-mono text-xs uppercase font-black tracking-widest shadow-glow">Authorize Access</Link>
+          {loading ? (
+             <div className="h-64 flex flex-col items-center justify-center gap-6">
+               <div className="w-12 h-12 rounded-full border-2 border-primary/10 border-t-primary animate-spin"></div>
+               <div className="text-center space-y-2">
+                 <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-primary animate-pulse">Retrieving Neural Archive...</p>
+                 <p className="text-slate-600 text-[9px] font-mono">Verifying authentication hashes...</p>
+               </div>
              </div>
-          ) : loading || authLoading ? (
-            <div className="py-20 text-center">
-              <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-primary animate-pulse">Decrypting Archive...</p>
-            </div>
           ) : fetchError ? (
             <div className="py-20 text-center border border-red-500/20 rounded-2xl bg-red-500/5">
               <span className="material-icons-round text-5xl mb-4 text-red-500/50">error_outline</span>
@@ -201,7 +201,6 @@ export default function HistoryPage() {
         </div>
       </main>
 
-      {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none z-[-1] opacity-20 bg-grid"></div>
     </div>
   );

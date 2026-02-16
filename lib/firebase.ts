@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAc7vqg4MINabljErnQg_cKlrHxol2uVI8",
-  authDomain: "debugly-ai-801.firebaseapp.com",
-  projectId: "debugly-ai-801",
-  storageBucket: "debugly-ai-801.firebasestorage.app",
-  messagingSenderId: "17086383324",
-  appId: "1:17086383324:web:2bd49f6c6f88a725ebe019"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase for SSR
