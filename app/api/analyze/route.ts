@@ -1,8 +1,9 @@
 import OpenAI from "openai";
-import { getUserByToken } from "@/lib/userService";
+import { getUserByToken, getUserProfile } from "@/lib/userService";
 import { saveAnalysis } from "@/lib/analysisService";
+import { analyzeWithGemini } from "@/lib/ai/gemini";
 
-const client = new OpenAI({
+const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: "https://api.groq.com/openai/v1",
 });
@@ -25,8 +26,18 @@ export async function POST(req: Request) {
       error, 
       locale = "English", 
       messages = [],
-      modelId = "llama-3.1-8b-instant"
+      modelId = "llama-3.1-8b-instant",
+      userKeys = {}
     } = await req.json();
+
+    // If user is authenticated but didn't provide keys in request, try to get from profile
+    let finalKeys = { ...userKeys };
+    if (authenticatedUser && !finalKeys.gemini && !finalKeys.groq) {
+      const profile = await getUserProfile(authenticatedUser.uid);
+      if (profile?.preferredKeys) {
+        finalKeys = { ...finalKeys, ...profile.preferredKeys };
+      }
+    }
 
     const systemPrompt = `You are a World-Class Senior Debugging Engineer (Staff Level). 
     Your task is to analyze error traces and related source code to provide extremely high-fidelity, actionable, and specific technical solutions.
@@ -70,12 +81,11 @@ export async function POST(req: Request) {
     
     Ensure the JSON is perfectly valid and complete.`;
 
-    const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    const chatMessages: any[] = [
       { role: "system", content: systemPrompt },
       ...messages.map((m: any) => ({ role: m.role, content: m.content })),
     ];
 
-    // Only add the initial context if this is the first analysis
     if (messages.length === 0) {
       let userMsg = "";
       if (context.length > 0) {
@@ -87,15 +97,28 @@ export async function POST(req: Request) {
       chatMessages.push({ role: "user", content: userMsg });
     }
 
-    const completion = await client.chat.completions.create({
-      model: modelId,
-      messages: chatMessages,
-      response_format: { type: "json_object" },
-      max_tokens: 2048,
-      temperature: 0.3
-    });
+    let result: any;
 
-    const result = JSON.parse(completion.choices[0].message.content || "{}");
+    if (modelId.startsWith("gemini")) {
+      const apiKey = finalKeys.gemini || process.env.GOOGLE_GEMINI_KEY;
+      if (!apiKey) {
+        return Response.json({ error: "Gemini API Key missing. Please configure it in settings." }, { status: 400 });
+      }
+      result = await analyzeWithGemini(chatMessages, apiKey, modelId);
+    } else {
+      // Default to Groq
+      const apiKey = finalKeys.groq || process.env.GROQ_API_KEY;
+      const client = finalKeys.groq ? new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" }) : groqClient;
+      
+      const completion = await client.chat.completions.create({
+        model: modelId,
+        messages: chatMessages,
+        response_format: { type: "json_object" },
+        max_tokens: 2048,
+        temperature: 0.3
+      });
+      result = JSON.parse(completion.choices[0].message.content || "{}");
+    }
     
     // Auto-persist for CLI/Token users
     if (authenticatedUser) {
@@ -111,7 +134,6 @@ export async function POST(req: Request) {
         return Response.json({ ...result, analysisId });
       } catch (saveErr) {
         console.error("Failed to auto-save CLI analysis:", saveErr);
-        // Still return the result even if save fails, but maybe with a warning
         return Response.json(result);
       }
     }

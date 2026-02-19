@@ -15,6 +15,10 @@ export interface UserProfile {
   displayName: string | null;
   photoURL: string | null;
   apiToken?: string;
+  preferredKeys?: {
+    gemini?: string;
+    groq?: string;
+  };
   createdAt: any;
 }
 
@@ -68,6 +72,18 @@ export const revokeApiToken = async (uid: string, currentToken: string): Promise
     await deleteDoc(tokenDocRef);
   } catch (error) {
     console.error("Error revoking API token:", error);
+    throw error;
+  }
+};
+
+export const updatePreferredKeys = async (uid: string, keys: { gemini?: string; groq?: string }): Promise<void> => {
+  try {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, {
+      preferredKeys: keys
+    });
+  } catch (error) {
+    console.error("Error updating preferred keys:", error);
     throw error;
   }
 };

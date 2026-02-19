@@ -19,14 +19,15 @@ export interface DebugResult {
 export const analyzeError = async (
   context: FileBuffer[], 
   locale: string = "English",
-  modelId: string = "llama-3.1-8b-instant"
+  modelId: string = "llama-3.1-8b-instant",
+  userKeys?: { gemini?: string; groq?: string }
 ): Promise<DebugResult> => {
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ context, locale, modelId }),
+    body: JSON.stringify({ context, locale, modelId, userKeys }),
   });
 
   if (!response.ok) {

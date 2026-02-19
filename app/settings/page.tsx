@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { getUserStats } from "@/lib/analysisService";
-import { getUserProfile, generateApiToken, revokeApiToken, UserProfile } from "@/lib/userService";
+import { getUserProfile, generateApiToken, revokeApiToken, updatePreferredKeys, UserProfile } from "@/lib/userService";
 
 export default function SettingsPage() {
   const { user, logout, loading } = useAuth();
@@ -186,11 +186,79 @@ export default function SettingsPage() {
               </div>
             </motion.div>
 
-            {/* Developer Access Card */}
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
+              className="p-6 rounded-xl border border-white/5 bg-[#0B0F14] shadow-glass"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-[0.02]">
+                <span className="material-icons-round text-8xl">bolt</span>
+              </div>
+              
+              <div className="relative z-10">
+                <h3 className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Neural Core Config (Zero-Cost)</h3>
+                <div className="space-y-6">
+                  <p className="text-slate-400 text-xs leading-relaxed font-mono">
+                    Paste your own API keys to use Debugly for free using personal allowances.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono text-slate-500 uppercase">Google Gemini API Key</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="password"
+                          placeholder="AIzaSy..."
+                          defaultValue={profile?.preferredKeys?.gemini}
+                          onBlur={async (e) => {
+                            if (user) {
+                              const newKeys = { ...profile?.preferredKeys, gemini: e.target.value };
+                              await updatePreferredKeys(user.uid, newKeys);
+                              setProfile(prev => prev ? { ...prev, preferredKeys: newKeys } : null);
+                              setMessage({ text: "Gemini Key updated.", type: "success" });
+                              setTimeout(() => setMessage(null), 3000);
+                            }
+                          }}
+                          className="flex-1 bg-black/40 rounded border border-white/10 p-2 font-mono text-xs text-primary focus:border-primary/50 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono text-slate-500 uppercase">Personal Groq API Key</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="password"
+                          placeholder="gsk_..."
+                          defaultValue={profile?.preferredKeys?.groq}
+                          onBlur={async (e) => {
+                            if (user) {
+                              const newKeys = { ...profile?.preferredKeys, groq: e.target.value };
+                              await updatePreferredKeys(user.uid, newKeys);
+                              setProfile(prev => prev ? { ...prev, preferredKeys: newKeys } : null);
+                              setMessage({ text: "Groq Key updated.", type: "success" });
+                              setTimeout(() => setMessage(null), 3000);
+                            }
+                          }}
+                          className="flex-1 bg-black/40 rounded border border-white/10 p-2 font-mono text-xs text-primary focus:border-primary/50 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-[9px] text-slate-600 font-mono italic">
+                    Keys are stored securely in your private profile.
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* API Token Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18 }}
               className="p-6 rounded-xl border border-white/5 bg-[#0B0F14] shadow-glass relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 p-4 opacity-[0.02]">
@@ -198,7 +266,7 @@ export default function SettingsPage() {
               </div>
               
               <div className="relative z-10">
-                <h3 className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Developer Access</h3>
+                <h3 className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Developer CLI Access</h3>
                 <div className="space-y-6">
                   <div className="max-w-xl">
                     <p className="text-slate-400 text-xs leading-relaxed mb-4 font-mono">

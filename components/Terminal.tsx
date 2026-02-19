@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import { FileBuffer } from "@/lib/analysisService";
 import { motion, AnimatePresence } from "framer-motion";
+import { indexWorkspace } from "@/lib/ai/workspaceService";
+import { db } from "@/lib/ai/vectorStore";
 
 const MODELS = [
   { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B (Speed)", detail: "Hyper-fast baseline analysis" },
   { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Depth)", detail: "High-fidelity architectural mapping" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Context)", detail: "Deep multivariable context (1M tokens)" },
 ];
 
 interface TerminalProps {
@@ -31,6 +34,60 @@ export default function Terminal({
   onModelChange,
 }: TerminalProps) {
   const [activeFileId, setActiveFileId] = useState<string>(files[0]?.id || "error");
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [indexingFile, setIndexingFile] = useState("");
+  const [workspaceLinked, setWorkspaceLinked] = useState(false);
+
+  // Check if we have vectors on load
+  React.useEffect(() => {
+    db.chunks.count().then(count => setWorkspaceLinked(count > 0));
+  }, []);
+
+  const handleSyncWorkspace = async () => {
+    try {
+      // @ts-ignore - showDirectoryPicker is a modern API
+      if (!window.showDirectoryPicker) {
+        alert("Your browser does not support the File System Access API. Please use Chrome/Edge.");
+        return;
+      }
+
+      // @ts-ignore
+      const dirHandle = await window.showDirectoryPicker();
+      setIsIndexing(true);
+      
+      const workspaceFiles: { path: string; content: string }[] = [];
+      
+      async function scan(handle: any, path: string = "") {
+        for await (const entry of handle.values()) {
+          const entryPath = path ? `${path}/${entry.name}` : entry.name;
+          if (entry.kind === 'file') {
+            // Only index code files
+            if (/\.(ts|tsx|js|jsx|py|go|rs|c|cpp|h|java)$/.test(entry.name)) {
+              const file = await entry.getFile();
+              const content = await file.text();
+              workspaceFiles.push({ path: entryPath, content });
+            }
+          } else if (entry.kind === 'directory' && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+            await scan(entry, entryPath);
+          }
+        }
+      }
+
+      await scan(dirHandle);
+      await db.chunks.clear(); // Fresh index
+      
+      await indexWorkspace(workspaceFiles, (progress) => {
+        setIndexingFile(`${progress.processedFiles}/${progress.totalFiles}: ${progress.currentFile}`);
+      });
+
+      setWorkspaceLinked(true);
+    } catch (err) {
+      console.error("Workspace sync failed:", err);
+    } finally {
+      setIsIndexing(false);
+      setIndexingFile("");
+    }
+  };
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0];
 
@@ -100,9 +157,24 @@ export default function Terminal({
             </select>
           </div>
           <div className="flex items-center gap-4 text-[10px] font-mono text-slate-500">
-            <span className="flex items-center gap-1.5">
+            {isIndexing ? (
+              <span className="flex items-center gap-2 text-primary animate-pulse">
+                <span className="material-icons-round text-xs spin">sync</span>
+                Indexing: {indexingFile}
+              </span>
+            ) : (
+              <button 
+                onClick={handleSyncWorkspace}
+                className="flex items-center gap-1.5 hover:text-primary transition-all group"
+                title="Index local workspace for semantic mapping"
+              >
+                <span className="material-icons-round text-xs group-hover:rotate-180 transition-all duration-500">hub</span>
+                {workspaceLinked ? "Workspace Active" : "Connect Workspace"}
+              </button>
+            )}
+            <span className="flex items-center gap-1.5 border-l border-white/5 pl-4">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 active-pulse"></span>
-              Context Mode: Multi-File
+              Context Mode: {workspaceLinked ? "Semantic" : "Multi-File"}
             </span>
           </div>
         </div>

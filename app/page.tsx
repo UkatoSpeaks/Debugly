@@ -4,10 +4,13 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { saveAnalysis, FileBuffer } from "@/lib/analysisService";
+import { getUserProfile } from "@/lib/userService";
 import { analyzeError } from "@/lib/ai/provider";
 import Navbar from "@/components/Navbar";
 import Terminal from "@/components/Terminal";
 import AnalysisPanel from "@/components/AnalysisPanel";
+import { searchWorkspace } from "@/lib/ai/workspaceService";
+import { db } from "@/lib/ai/vectorStore";
 
 const LOCALES = ["English", "Spanish", "French", "German", "Hindi", "Japanese"];
 
@@ -27,6 +30,16 @@ export default function LandingPage() {
   const [selectedLocale, setSelectedLocale] = useState("English");
   const [selectedModel, setSelectedModel] = useState("llama-3.1-8b-instant");
   const [copied, setCopied] = useState(false);
+
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) {
+      getUserProfile(user.uid).then(setProfile);
+    } else {
+      setProfile(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     const trigger = localStorage.getItem("debugly_test_trigger");
@@ -51,7 +64,28 @@ export default function LandingPage() {
     setAnalysisId(null);
     
     try {
-      const result = await analyzeError(files, selectedLocale, selectedModel);
+      let finalContext = [...files];
+      
+      // Semantic Search: If workspace is linked, find relevant context
+      const chunkCount = await db.chunks.count();
+      if (chunkCount > 0) {
+        setAnalysisError("Scanning workspace for semantic context...");
+        const relevantChunks = await searchWorkspace(mainError, 4);
+        
+        // Add retrieved chunks to context if they aren't already there
+        relevantChunks.forEach((chunk, index) => {
+          if (!finalContext.some(f => f.content === chunk.content)) {
+            finalContext.push({
+              id: `semantic-${index}`,
+              name: `${chunk.filePath} (L${chunk.metadata.startLine}-${chunk.metadata.endLine})`,
+              content: chunk.content
+            });
+          }
+        });
+        setAnalysisError(null);
+      }
+
+      const result = await analyzeError(finalContext, selectedLocale, selectedModel, profile?.preferredKeys);
       setCurrentAnalysis(result);
       setIsAnalyzing(false);
       setShowAnalysis(true);

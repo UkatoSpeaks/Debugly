@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatInterface from "./ChatInterface";
 import { useAuth } from "@/context/AuthContext";
 import CommentsSection from "./CommentsSection";
+import TraceVisualizer from "./TraceVisualizer";
 
 interface AnalysisPanelProps {
   showAnalysis: boolean;
@@ -105,6 +106,10 @@ export default function AnalysisPanel({
                   <p className="text-slate-300 text-sm leading-relaxed">
                     {currentAnalysis.whatBroke}
                   </p>
+                  
+                  {currentAnalysis.originalError && (
+                    <TraceVisualizer stackTrace={currentAnalysis.originalError} />
+                  )}
                 </div>
               </motion.div>
 
