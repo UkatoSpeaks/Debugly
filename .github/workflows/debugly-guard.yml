@@ -1,0 +1,37 @@
+name: Debugly PR Guard
+
+on:
+  pull_request:
+    branches: [ main ]
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      mock_error:
+        description: 'Mock error trace for testing'
+        required: false
+        default: 'Error: Cannot read property "id" of undefined at handleAuth (lib/userService.ts:45:12)'
+
+jobs:
+  analyze_failure:
+    runs-on: ubuntu-latest
+    # Only run if the previous CI job failed, or if manually triggered
+    # In a real scenario, you'd add 'needs: [test, build]' and 'if: failure()'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/uses-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install @octokit/rest
+
+      - name: Run Debugly Analysis
+        env:
+          DEBUGLY_TOKEN: ${{ secrets.DEBUGLY_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          ERROR_TRACE: ${{ github.event.inputs.mock_error || 'CI Build Failed. Please check the logs.' }}
+        run: node scripts/pr-guard.mjs
